@@ -5,7 +5,6 @@
 import asyncio
 
 from telethon import events
-from telethon.tl.types import InputPeerSelf
 import telethon.utils
 
 from uniborg import util
@@ -21,8 +20,6 @@ async def get_target_message(event):
 
 
 async def await_read(chat, message):
-    if isinstance(chat, InputPeerSelf):
-        return
     chat = telethon.utils.get_peer_id(chat)
 
     async def read_filter(read_event):
@@ -37,8 +34,8 @@ async def await_read(chat, message):
     await fut
 
 
-@borg.on(util.admin_cmd(r"^\.(del)(?:ete)?$"))
-@borg.on(util.admin_cmd(r"^\.(edit)(?:\s+(.*))?$"))
+@borg.on(util.admin_cmd(pattern="(del)(?:ete)?$"))
+@borg.on(util.admin_cmd(pattern="(edit)(?:\s+(.*))?$"))
 async def delete(event):
     await event.delete()
     command = event.pattern_match.group(1)
@@ -54,4 +51,4 @@ async def delete(event):
         if command == 'edit':
             await borg.edit_message(chat, target, text)
         else:
-            await borg.delete_messages(chat, target)
+            await borg.delete_messages(chat, target, revoke=True)

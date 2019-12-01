@@ -31,24 +31,17 @@ def get_tag_parser(tag, entity):
     return re.compile(tag + r'(.+?)' + tag, re.DOTALL), tag_parser
 
 
+PRINTABLE_ASCII = range(0x21, 0x7f)
 def parse_aesthetics(m):
     def aesthetify(string):
         for c in string:
-            if " " < c <= "~":
-                yield chr(ord(c) + 0xFF00 - 0x20)
-            elif c == " ":
-                yield "\u3000"
-            else:
-                yield c
+            c = ord(c)
+            if c in PRINTABLE_ASCII:
+                c += 0xFF00 - 0x20
+            elif c == ord(" "):
+                c = 0x3000
+            yield chr(c)
     return "".join(aesthetify(m[1])), None
-
-
-def parse_strikethrough(m):
-    return ("\u0336".join(m[1]) + "\u0336"), None
-
-
-def parse_enclosing_circle(m):
-    return ("\u20e0".join(m[1]) + "\u20e0"), None
 
 
 def parse_subreddit(m):
@@ -61,15 +54,10 @@ def parse_subreddit(m):
     return m.group(1) + text, entity
 
 
-def parse_snip(m):
-    try:
-        name = m.group(1)[1:]
-        snip = borg._plugins['snip'].storage.snips[name]
-        if snip['type'] == borg._plugins['snip'].TYPE_TEXT:
-            return snip['text'], None
-    except KeyError:
-        pass
-    return m.group(1), None
+def parse_strikethrough(m):
+    text = m.group(2)
+    text =  "\u0336".join(text) + "\u0336 "
+    return text, None
 
 
 PARSED_ENTITIES = (
@@ -85,10 +73,8 @@ MATCHERS = [
     (get_tag_parser('```', partial(MessageEntityPre, language=''))),
     (get_tag_parser('`', MessageEntityCode)),
     (re.compile(r'\+\+(.+?)\+\+'), parse_aesthetics),
-    (re.compile(r'~~(.+?)~~'), parse_strikethrough),
-    (re.compile(r'@@(.+?)@@'), parse_enclosing_circle),
     (re.compile(r'([^/\w]|^)(/?(r/\w+))'), parse_subreddit),
-    (re.compile(r'(!\w+)'), parse_snip)
+    (re.compile(r"(?<!\w)(~{2})(?!~~)(.+?)(?<!~)\1(?!\w)"), parse_strikethrough)
 ]
 
 
@@ -107,8 +93,6 @@ def parse(message, old_entities=None):
             # Skip already existing entities if we're at one
             if i == e.offset:
                 i += e.length
-        else:
-            after += 1
 
         # Find the first pattern that matches
         for pattern, parser in MATCHERS:
